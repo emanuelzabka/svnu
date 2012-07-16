@@ -1,0 +1,270 @@
+#!/bin/bash
+
+# Bin paths discovery
+grep="$(which grep)"
+svn="$(which svn)"
+sed="$(which sed)"
+less="$(which less)"
+vimdiff="$(which vimdiff)"
+dialog="$(which dialog)"
+basename="$(which basename)"
+
+# Echo to error file descriptor
+function echoerr() {
+	echo $@ >&2
+}
+
+# Escape an argument
+function escapeArg() {
+	echo '"'$(echo $@ | sed 's/"/\\"/g')'"'
+}
+
+# Convert argv to string
+function argvToString() {
+	local i=0
+	local c=${#argv[@]}
+	local result=""
+	while [ $i -lt $c ]; do
+		result="$result "$(escapeArg ${argv[$i]})
+		let i++
+	done
+	echo $result
+}
+
+# Returns the head arg of argv
+function headArg() {
+	echo ${argv[0]}
+}
+
+# Removes the head arg of argv
+function shiftArg() {
+	declare -a tmp
+	local i=1
+	local c=${#argv[@]}
+	while [ $i -lt $c ]; do
+		tmp[$(($i - 1))]=${argv[$i]}
+		let i++;
+	done
+	argv=("${tmp[@]}")
+}
+
+# Returns the svn revisions
+function getRevisions () {
+	target="$1"
+	limit="$2"
+	local IFS="
+"
+	for line in `"$svn" log -q -l "$limit" "$target"`; do
+		rev=`echo "$line" | "$sed" 's/^\(r[0-9]\+\).*$/\1/'`
+		rev=`echo "$rev" | "$sed" 's/-\+//'`
+		if [ "$rev" != "" ]; then
+			echo "$rev"
+		fi
+	done
+}
+
+# Returns a revision identifier by numeric index
+function getRevisionByIndex () {
+	target="$1"
+	rev_index=$(($2 + 1))
+	local i=1
+	for r in $(getRevisions "$target" "$rev_index"); do
+		rev="$r"
+		if [ $i -eq $rev_index ] || [ $i -gt $rev_index ]; then
+			break
+		fi
+		let i++
+	done
+	echo "$rev"
+}
+
+# Init args
+declare -a argv
+i=0
+for a in "$@"; do
+	argv[$i]="$a"
+	let i++
+done
+
+cmd=$(headArg)
+
+if [ "$cmd" == "" ];
+then
+	# @TODO Adicionar ajuda e opções de uso
+	echoerr "Erro: Um comando deve ser informado."
+	exit 1
+fi
+
+case "$cmd" in
+"log")
+	shiftArg
+	eval "$svn"" log "$(argvToString) | less
+	;;
+# Grep, ignoring .svn directories
+"grep")
+	shiftArg
+	eval "$grep"" "$(argvToString) | "$grep" -v '/.svn/'
+	;;
+# Edit commit log
+"edit-log")
+	shiftArg
+	rev=$(headArg | "$sed" 's/^-\?r//')
+	# Remove -r or r from revision string
+	if [ "$rev" == "" ]; then
+		rev="HEAD"
+	fi
+	"$svn" propedit --revprop svn:log -r"$rev"
+	;;
+# Direct diff to vim
+"diff")
+	"$svn" $@ | vim - -c "set syntax=diff buftype=nofile nowrap nobackup previewwindow bufhidden=delete"
+	;;
+# Extended diff
+"ediff")
+	shiftArg
+	num=$(headArg)
+	shiftArg
+	target=$(headArg)
+	shiftArg
+	rev=$(headArg)
+	"$svn" diff $target -r "$rev"
+	echo "svnu: Diff with '$target' in revision $rev."
+	;;
+# Vimdiff between file of different revisions
+"vdiff")
+	# Valida número de parâmetros
+	if [ $# -lt 2 ];
+	then
+		echoerr "Erro: vdiff espera no mínimo um argumento. <file> [<r<revision>|<version count>>] [<r<revision>|<version count>>]"
+		exit 1
+	fi
+	shiftArg
+	target=$(headArg)
+	# If no left number, use default 0 (HEAD)
+	if [ $# -gt 2 ]; then
+		shiftArg
+		leftn=$(headArg)
+	else
+		leftn=0
+	fi
+	shiftArg
+	rightn=""
+	if [ $# -gt 2 ]; then
+		rightn=$(headArg)
+		shiftArg
+	fi
+	if [ "${leftn:0:1}" != "r" ]; then
+		rev=$(getRevisionByIndex "$target" "$leftn")
+	else
+		rev="$leftn"
+	fi
+	filename=$("$basename" $target)
+	right_file="/tmp/vdiff.$rev.$filename"
+	"$svn" cat "$target"@"$rev" > "$right_file"
+	left_file="$target"
+	# Right revision was informed
+	if [ "$rightn" != "" ]; then
+		if [ "${rightn:0:1}" != "r" ]; then
+			revr=$(getRevisionByIndex "$target" "$rightn")
+		else
+			revr="$rightn"
+		fi
+		"$svn" cat "$target"@"$revr" > "/tmp/vdiff.$revr.$filename"
+		left_file="$right_file"
+		right_file="/tmp/vdiff.$revr.$filename"
+	fi
+	"$vimdiff" "$left_file" "$right_file"
+	if [ "$revr" == "" ]; then
+		echo "svnu: Diff with '$target' in revision $rev"
+	else
+		echo "svnu: Diff with '$target' between revision $rev and $revr"
+	fi
+	;;
+"pre-commit" | "pre-ci" | "pci")
+	if [ "$dialog" == "" ]; then
+		echoerr "Erro: dependência de aplicativo não encontrado.
+Instale 'dialog' para poder utilizar essa funcionalidade."
+		exit 1
+	fi
+	shiftArg
+	changes=$(eval "$svn"" status "$(argvToString) | "$sed" 's/^\([MADR!?]\).\{6\}\s\(.*\)$/- (\1) \2\n/' | "$sed" '/^[^-]\|^$/d' | "$sed" 's/^-\s//')
+	options=""
+	IFS="
+"
+	for c in $changes; do
+		options="$options \"$c\" \"\" off"
+	done
+	unset IFS
+	# Sem arquivos para comitar
+	if [ "$options" == "" ]; then
+		exit 0
+	fi
+	exec 3>&1
+	selected=$(echo --title "\"SVNU Pre-commit\"" --checklist "Arquivos" 500 500 50 $options | xargs "$dialog" 2>&1 1>&3)
+	clear
+	exec 3>&-
+	if [ "$selected" == "" ]; then
+		exit 0
+	fi
+	IFS='"'
+	files=""
+	commands=""
+	for s in $selected; do
+		# Trim
+		s=$(echo $s | "$sed" 's/^\s*\(.*\)\s*$/\1/')
+		# Remove char escaping
+		s=$(eval "echo $s")
+		if [ "$s" != "" ]; then
+			# Get file status flag
+			flag=$(echo $s | "$sed" 's/^(\(.\).*$/\1/')
+			# Get file
+			file=$(echo $s | "$sed" 's/^(.)\s\(.*\)$/\1/')
+			if [ "$flag" == "?" ]; then
+				c=$("$basename" "$svn")" add \"$file\""
+				commands="$commands $c;"
+				unset IFS
+				echo $c
+				IFS='"'
+			elif [ "$flag" == "!" ]; then
+				c=$("$basename" "$svn")" remove \"$file\""
+				commands="$commands $c;"
+				unset IFS
+				echo $c
+				IFS='"'
+			fi
+			files="$files \"$file\""
+		fi
+	done
+	unset IFS
+	c=$("$basename" "$0")" commit $files"
+	commands="$commands $c"
+	echo $c
+	echo "------------------------------------"
+	echo -n "Executar os comandos gerados? [s/N]: "
+	read answer
+	if [ "$answer" == "s" ] || [ "$answer" == "S" ]; then
+		eval $commands
+	fi
+	;;
+"ci" | "commit")
+	SVN_EDITOR='\
+					vim -c "4,\$y" \
+					-c "below new" \
+					-c "put" \
+					-c "set syntax=diff buftype=nofile nowrap nobackup previewwindow bufhidden=delete" \
+					-c "silent execute \"%!cut -c-5 --complement | xargs svn diff --no-diff-deleted -x --ignore-eol-style\" | redraw" \
+					-c "wincmd k" +0' "$svn" $@
+	;;
+# Default action, redirect to svn
+*)
+	# This path
+	workdir=$(readlink -f $0)
+	shiftArg
+	# Verify if a plugin for command exists
+	if [ -x "$(dirname $workdir)/plugins/$cmd" ]; then
+		. "$(dirname $workdir)/plugins/$cmd" $(argvToString)
+	else
+		"$svn" $@
+	fi;
+	;;
+esac
