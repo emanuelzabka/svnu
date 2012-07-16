@@ -90,12 +90,24 @@ cmd=$(headArg)
 
 if [ "$cmd" == "" ];
 then
-	# @TODO Adicionar ajuda e opções de uso
-	echoerr "Erro: Um comando deve ser informado."
+	echoerr "Digite '"$(basename "$0")" help' para ajuda."
 	exit 1
 fi
 
 case "$cmd" in
+"help")
+	echo "uso: svnu <sub-comando> <opcoes>"
+	echo "Utilitários para uso do sistema de subversion SVN."
+	echo "Sub-comandos disponíveis:"
+	echo "	log"
+	echo "	grep"
+	echo "	edit-log"
+	echo "	diff"
+	echo "	ediff"
+	echo "	vdiff"
+	echo "	pre-commit|pre-ci|pci"
+	echo "	commit|ci"
+	;;
 "log")
 	shiftArg
 	eval "$svn"" log "$(argvToString) | less
