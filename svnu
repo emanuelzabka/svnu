@@ -99,14 +99,23 @@ case "$cmd" in
 	echo "uso: svnu <sub-comando> <opcoes>"
 	echo "Utilitários para uso do sistema de subversion SVN."
 	echo "Sub-comandos disponíveis:"
-	echo "	log"
-	echo "	grep"
-	echo "	edit-log"
-	echo "	diff"
-	echo "	ediff"
-	echo "	vdiff"
-	echo "	pre-commit|pre-ci|pci"
-	echo "	commit|ci"
+	echo "	log: Executa sub-comando log do svn paginando"
+	echo "	grep: Realiza grep ignorando '.svn'"
+	echo "	edit-log: Edita log de svn para a última revisão ou uma revisão especificada"
+	echo "		uso: svnu edit-log [<rev>]"
+	echo "	diff: Realiza diff e o abre no vim"
+	echo "	vdiff: Vimdiff entre revisões"
+	echo "		uso: svnu vdiff <file> [r<revision>|<version count>] [r<revision>|<version count>]"
+	echo "		exemplos:"
+	echo "			svnu vdiff arquivo"
+	echo "			svnu vdiff arquivo 2"
+	echo "			svnu vdiff arquivo r10"
+	echo "			svnu vdiff arquivo 1 2"
+	echo "			svnu vdiff arquivo r9 r10"
+	echo "	pre-commit|pre-ci|pci: Comando para escolher arquivos e preparar commit"
+	echo "	commit|ci: Executa commit mostrando informações adicionais no momento da edição do texto de log"
+	echo ""
+	echo "Para ajuda sobre comandos do svn digite 'svn help'."
 	;;
 "log")
 	shiftArg
@@ -131,23 +140,12 @@ case "$cmd" in
 "diff")
 	"$svn" $@ | vim - -c "set syntax=diff buftype=nofile nowrap nobackup previewwindow bufhidden=delete"
 	;;
-# Extended diff
-"ediff")
-	shiftArg
-	num=$(headArg)
-	shiftArg
-	target=$(headArg)
-	shiftArg
-	rev=$(headArg)
-	"$svn" diff $target -r "$rev"
-	echo "svnu: Diff with '$target' in revision $rev."
-	;;
 # Vimdiff between file of different revisions
 "vdiff")
 	# Valida número de parâmetros
 	if [ $# -lt 2 ];
 	then
-		echoerr "Erro: vdiff espera no mínimo um argumento. <file> [<r<revision>|<version count>>] [<r<revision>|<version count>>]"
+		echoerr "Erro: vdiff espera no mínimo um argumento. <file> [r<revision>|<version count>] [r<revision>|<version count>]"
 		exit 1
 	fi
 	shiftArg
