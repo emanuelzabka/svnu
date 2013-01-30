@@ -124,7 +124,7 @@ case "$cmd" in
 # Grep, ignoring .svn directories
 "grep")
 	shiftArg
-	eval "$grep"" "$(argvToString) | "$grep" -v '/.svn/'
+	eval "$grep" --exclude-dir=".svn" --color "$(argvToString)"
 	;;
 # Edit commit log
 "edit-log")
@@ -191,6 +191,7 @@ case "$cmd" in
 	fi
 	;;
 "pre-commit" | "pre-ci" | "pci")
+	# @TODO implementar commit com diferentes repositórios (externals)
 	if [ "$dialog" == "" ]; then
 		echoerr "Erro: dependência de aplicativo não encontrado.
 Instale 'dialog' para poder utilizar essa funcionalidade."
