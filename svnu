@@ -272,9 +272,9 @@ Instale 'dialog' para poder utilizar essa funcionalidade."
 	# This path
 	workdir=$(readlink -f $0)
 	shiftArg
-	# Verify if a plugin for command exists
+	# Verify if a plugin for the command exists
 	if [ -x "$(dirname $workdir)/plugins/$cmd" ]; then
-		. "$(dirname $workdir)/plugins/$cmd" $(argvToString)
+		eval "$(dirname $workdir)/plugins/$cmd" $(argvToString)
 	else
 		"$svn" $@
 	fi;

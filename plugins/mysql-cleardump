@@ -1,0 +1,30 @@
+#!/bin/bash
+
+BIN_PREFIX="svnu mysql-cleardump"
+
+if [ "$1" == "" ] || [ "$1" == "--help" ] || [ "$1" == "-h" ]; then
+	echo "Executa a limpeza de um arquivo de dump sql de MYSQL retirando os DEFINERS existentes."
+	echo "Uso:"
+	echo "	$BIN_PREFIX <arquivo sql>"
+	echo "	$BIN_PREFIX <arquivo sql> --force	# Não confirma a modificação do arquivo"
+	echo "	$BIN_PREFIX <arquivo sql> -f		# Não confirma a modificação do arquivo"
+	echo "	$BIN_PREFIX --help			# Exibe essa ajuda"
+	echo "	$BIN_PREFIX --h			# Exibe essa ajuda"
+	exit 0
+fi
+if [ ! -e "$1" ]; then
+	echo "Arquivo não encontrado: '$1'"
+	exit -1
+fi
+if [ "$2" != "--force" ] && [ "$2" != "-f" ]; then
+	echo -n "O arquivo '$1' será modificado. Tem certeza que deseja continuar [S/n]: "
+	read answer
+	if [ "$answer" != "" ] && [ "$answer" != "S" ]; then
+		echo "Execução cancelada."
+		exit 1
+	fi
+fi
+sed -i 's/\/\*\![0-9]\+ DEFINER[^*]\+\*\/[ ]\?//g' "$1"
+if [ $? -eq 0 ]; then
+	echo "Terminado."
+fi
