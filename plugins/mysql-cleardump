@@ -25,6 +25,7 @@ if [ "$2" != "--force" ] && [ "$2" != "-f" ]; then
 	fi
 fi
 sed -i 's/\/\*\![0-9]\+ DEFINER[^*]\+\*\/[ ]\?//g' "$1"
+sed -i 's/DEFINER=`[^`]\+`@`[^`]\+`//g' "$1"
 if [ $? -eq 0 ]; then
 	echo "Terminado."
 fi
