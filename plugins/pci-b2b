@@ -1,0 +1,92 @@
+#!/bin/bash
+svn="$(which svn)"
+sed="$(which sed)"
+dialog="$(which dialog)"
+basename=$(which basename)
+
+# Echo to error file descriptor
+function echoerr() {
+	echo $@ >&2
+}
+
+function goToBaseDir() {
+	while [ ! -f "scripts/b2b-utils" ] && [ `pwd` != "/" ]; do
+		cd ..
+	done
+	if [ `pwd` == "/" ]; then
+		echo "Não foi possível encontrar diretório base."
+		echo "Execute o comando dentro de um diretório na estrutura de b2b."
+		exit 1
+	fi
+}
+
+goToBaseDir
+
+if [ "$dialog" == "" ]; then
+	echoerr "Erro: dependência de aplicativo não encontrado.
+Instale 'dialog' para poder utilizar essa funcionalidade."
+	exit 1
+fi
+changes=$(./scripts/b2b-utils -a status | "$sed" 's/^\([MADR!?]\).\{6\}\s\(.*\)$/- (\1) \2\n/' | "$sed" '/^[^-]\|^$/d' | "$sed" 's/^-\s//')
+options=""
+IFS="
+"
+pwd=$(pwd)'/'
+pwd=$(echo "$pwd" | "$sed" 's/\//\\\//g')
+for c in $changes; do
+	#c=$(echo "$c" | "$sed" 's/'$pwd'//')
+	options="$options \"$c\" \"\" off"
+done
+unset IFS
+# Sem arquivos para comitar
+if [ "$options" == "" ]; then
+	exit 0
+fi
+exec 3>&1
+selected=$(echo --title "\"SVNU Pre-commit\"" --checklist "Arquivos" 500 500 50 $options | xargs "$dialog" 2>&1 1>&3)
+clear
+exec 3>&-
+# Cancel or ESC key pressed (xargs info)
+if [ "$selected" == "" ] || [ "${selected:0:6}" == "xargs:" ]; then
+	exit 0
+fi
+IFS='"'
+files=""
+commands=""
+for s in $selected; do
+	# Trim
+	s=$(echo $s | "$sed" 's/^\s*\(.*\)\s*$/\1/')
+	# Remove char escaping
+	s=$(eval "echo $s")
+	if [ "$s" != "" ]; then
+		# Get file status flag
+		flag=$(echo $s | "$sed" 's/^(\(.\).*$/\1/')
+		# Get file
+		file=$(echo $s | "$sed" 's/^(.)\s\(.*\)$/\1/')
+		if [ "$flag" == "?" ]; then
+			c=$("$basename" "$svn")" add \"$file\""
+			commands="$commands $c;"
+			unset IFS
+			echo $c
+			IFS='"'
+		elif [ "$flag" == "!" ]; then
+			c=$("$basename" "$svn")" remove \"$file\""
+			commands="$commands $c;"
+			unset IFS
+			echo $c
+			IFS='"'
+		fi
+		files="$files \"$file\""
+	fi
+done
+unset IFS
+c="svnu commit $files"
+commands="$commands $c"
+echo $c
+echo "------------------------------------"
+echo -n "Executar os comandos gerados? [s/N]: "
+read answer
+if [ "$answer" == "s" ] || [ "$answer" == "S" ]; then
+	pwd
+	eval $commands
+fi
