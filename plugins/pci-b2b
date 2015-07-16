@@ -34,7 +34,7 @@ IFS="
 pwd=$(pwd)'/'
 pwd=$(echo "$pwd" | "$sed" 's/\//\\\//g')
 for c in $changes; do
-	#c=$(echo "$c" | "$sed" 's/'$pwd'//')
+	c=$(echo "$c" | "$sed" 's/'$pwd'//')
 	options="$options \"$c\" \"\" off"
 done
 unset IFS
