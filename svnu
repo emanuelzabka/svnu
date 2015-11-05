@@ -259,7 +259,7 @@ Instale 'dialog' para poder utilizar essa funcionalidade."
 		s=$(eval "echo $s")
 		if [ "$s" != "" ]; then
 			# Get file status flag
-			flag=$(echo $s | "$sed" 's/^(\(.*\).*$/\1/')
+			flag=$(echo $s | "$sed" 's/^(\(.*\)).*$/\1/')
 			# Get file
 			file=$(echo $s | "$sed" 's/^(.*)\s\(.*\)$/\1/')
 			if [ "$flag" == "?" ]; then
