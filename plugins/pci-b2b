@@ -27,7 +27,7 @@ if [ "$dialog" == "" ]; then
 Instale 'dialog' para poder utilizar essa funcionalidade."
 	exit 1
 fi
-changes=$(./scripts/b2b-utils -a status | "$sed" 's/^\([MADR!?]\).\{6\}\s\(.*\)$/- (\1) \2\n/' | "$sed" '/^[^-]\|^$/d' | "$sed" 's/^-\s//')
+changes=$(./scripts/b2b-utils -a status | "$sed" 's/^\( M\|[MADR!?]\).\{5,6\}\s\(.*\)$/- (\1) \2\n/' | "$sed" '/^[^-]\|^$/d' | "$sed" 's/^-\s//')
 options=""
 IFS="
 "
@@ -60,9 +60,9 @@ for s in $selected; do
 	s=$(eval "echo $s")
 	if [ "$s" != "" ]; then
 		# Get file status flag
-		flag=$(echo $s | "$sed" 's/^(\(.\).*$/\1/')
+		flag=$(echo $s | "$sed" 's/^(\(.*\).*$/\1/')
 		# Get file
-		file=$(echo $s | "$sed" 's/^(.)\s\(.*\)$/\1/')
+		file=$(echo $s | "$sed" 's/^(.*)\s\(.*\)$/\1/')
 		if [ "$flag" == "?" ]; then
 			c=$("$basename" "$svn")" add \"$file\""
 			commands="$commands $c;"

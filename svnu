@@ -117,6 +117,37 @@ case "$cmd" in
 	echo ""
 	echo "Para ajuda sobre comandos do svn digite 'svn help'."
 	;;
+"list-files")
+	shiftArg
+	leftn=""
+	if [ $# -gt 1 ]; then
+		leftn=$(headArg | "$sed" 's/^-\?r//')
+		shiftArg
+	fi
+	rightn=""
+	if [ $# -gt 2 ]; then
+		rightn=$(headArg | "$sed" 's/^-\?r//')
+		shiftArg
+	fi
+	if [ "$leftn" == "" ] && [ "$rightn" == "" ]; then
+		rightn=$(getRevisionByIndex . 1)
+	fi
+	if [ "$leftn" == "" ]; then
+		leftn=$(getRevisionByIndex . 0)
+	fi
+	if [ "$rightn" == "" ]; then
+		rightn=$(getRevisionByIndex . 0)
+	fi
+	files=$("$svn" diff --summarize "-r$leftn:$rightn")
+	IFS="
+"
+	for f in $files; do
+		echo $f
+		#v=$(echo "$f" | "$sed" 's/^.\{8\}//')
+		#echo $v
+	done
+	unset IFS
+	;;
 "log")
 	shiftArg
 	eval "$svn"" log "$(argvToString) | less
@@ -124,7 +155,7 @@ case "$cmd" in
 # Grep, ignoring .svn directories
 "grep")
 	shiftArg
-	eval "$grep" --exclude-dir=".svn" --color "$(argvToString)"
+	eval "$grep" --exclude-dir=".svn" --color "$(argvToString)" 2>/dev/null
 	;;
 # Edit commit log
 "edit-log")
@@ -198,7 +229,7 @@ Instale 'dialog' para poder utilizar essa funcionalidade."
 		exit 1
 	fi
 	shiftArg
-	changes=$(eval "$svn"" status "$(argvToString) | "$sed" 's/^\([MADR!?]\).\{6\}\s\(.*\)$/- (\1) \2\n/' | "$sed" '/^[^-]\|^$/d' | "$sed" 's/^-\s//')
+	changes=$(eval "$svn"" status "$(argvToString) | "$sed" 's/^\( M\|[MADR!?]\).\{5,6\}\s\(.*\)$/- (\1) \2\n/' | "$sed" '/^[^-]\|^$/d' | "$sed" 's/^-\s//')
 	options=""
 	IFS="
 "
@@ -228,9 +259,9 @@ Instale 'dialog' para poder utilizar essa funcionalidade."
 		s=$(eval "echo $s")
 		if [ "$s" != "" ]; then
 			# Get file status flag
-			flag=$(echo $s | "$sed" 's/^(\(.\).*$/\1/')
+			flag=$(echo $s | "$sed" 's/^(\(.*\).*$/\1/')
 			# Get file
-			file=$(echo $s | "$sed" 's/^(.)\s\(.*\)$/\1/')
+			file=$(echo $s | "$sed" 's/^(.*)\s\(.*\)$/\1/')
 			if [ "$flag" == "?" ]; then
 				c=$("$basename" "$svn")" add \"$file\""
 				commands="$commands $c;"
