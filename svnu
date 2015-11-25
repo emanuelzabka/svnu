@@ -230,31 +230,44 @@ Instale 'dialog' para poder utilizar essa funcionalidade."
 	fi
 	shiftArg
 	changes=$(eval "$svn"" status "$(argvToString) | "$sed" 's/^\( M\|[MADR!?]\).\{5,6\}\s\(.*\)$/- (\1) \2\n/' | "$sed" '/^[^-]\|^$/d' | "$sed" 's/^-\s//')
-# Obtenção de opções para dialog
-	options=""
-	IFS="
-"
-	for c in $changes; do options="$options \"$c\" \"\" off"; done
-	unset IFS
-	# Sem arquivos para comitar
-	if [ "$options" == "" ]; then
-		exit 0
-	fi
-	# Configuração para que dialog possa ser executado em subcontextos
-	exec 3>&1
-	# Execução do comando de dialog
+
+	# Se está no menu (escolha de marcar/desmarcar todos)
+	inmenu=1
+	# Label para o botão de marcar/desmarcar todos
+	checkUncheckLabel="Marcar todos"
+	# Flag de seleção para as opções
+	flag="off"
 	tempfile=`tempfile 2>/dev/null` || tempfile=/tmp/pcitmp
-	eval $dialog --title "\"SVNU Pre-commit\"" --extra-button --extra-label "\"Marcar todos\"" --checklist "\"Arquivos\"" 500 500 50 $options 2> $tempfile
-	retval=$?
-	if [ $retval -eq 3 ]; then
-		# Obtenção de opções para dialog
+	while [ $inmenu -eq 1 ]; do
 		options=""
 		IFS="
 "
-		for c in $changes; do options="$options \"$c\" \"\" on"; done
+		for c in $changes; do options="$options \"$c\" \"\" $flag"; done
 		unset IFS
-		eval $dialog --title "\"SVNU Pre-commit\"" --checklist "\"Arquivos\"" 500 500 50 $options 2> $tempfile
-	fi
+		# Sem arquivos para comitar
+		if [ "$options" == "" ]; then
+			exit 0
+		fi
+
+		# Configuração para que dialog possa ser executado em subcontextos
+		exec 3>&1
+		# Execução do comando de dialog
+		eval $dialog --title "\"SVNU Pre-commit\"" --extra-button --extra-label "\"$checkUncheckLabel\"" --checklist "\"Arquivos\"" 500 500 50 $options 2> $tempfile
+		retval=$?
+
+		if [ ! $retval -eq 3 ]; then
+			inmenu=0
+		fi
+
+
+		if [ "$flag" == "off" ]; then
+			checkUncheckLabel="Desmarcar todos"
+			flag="on"
+		else
+			checkUncheckLabel="Marcar todos"
+			flag="off"
+		fi
+	done
 	selected=$(cat $tempfile)
 	rm $tempfile
 	clear
