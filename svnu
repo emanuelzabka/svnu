@@ -230,20 +230,35 @@ Instale 'dialog' para poder utilizar essa funcionalidade."
 	fi
 	shiftArg
 	changes=$(eval "$svn"" status "$(argvToString) | "$sed" 's/^\( M\|[MADR!?]\).\{5,6\}\s\(.*\)$/- (\1) \2\n/' | "$sed" '/^[^-]\|^$/d' | "$sed" 's/^-\s//')
+# Obtenção de opções para dialog
 	options=""
 	IFS="
 "
-	for c in $changes; do
-		options="$options \"$c\" \"\" off"
-	done
+	for c in $changes; do options="$options \"$c\" \"\" off"; done
 	unset IFS
 	# Sem arquivos para comitar
 	if [ "$options" == "" ]; then
 		exit 0
 	fi
+	# Configuração para que dialog possa ser executado em subcontextos
 	exec 3>&1
-	selected=$(echo --title "\"SVNU Pre-commit\"" --checklist "Arquivos" 500 500 50 $options | xargs "$dialog" 2>&1 1>&3)
+	# Execução do comando de dialog
+	tempfile=`tempfile 2>/dev/null` || tempfile=/tmp/pcitmp
+	eval $dialog --title "\"SVNU Pre-commit\"" --extra-button --extra-label "\"Marcar todos\"" --checklist "\"Arquivos\"" 500 500 50 $options 2> $tempfile
+	retval=$?
+	if [ $retval -eq 3 ]; then
+		# Obtenção de opções para dialog
+		options=""
+		IFS="
+"
+		for c in $changes; do options="$options \"$c\" \"\" on"; done
+		unset IFS
+		eval $dialog --title "\"SVNU Pre-commit\"" --checklist "\"Arquivos\"" 500 500 50 $options 2> $tempfile
+	fi
+	selected=$(cat $tempfile)
+	rm $tempfile
 	clear
+	# Configuração para que dialog possa ser executado em subcontextos
 	exec 3>&-
 	# Cancel or ESC key pressed (xargs info)
 	if [ "$selected" == "" ] || [ "${selected:0:6}" == "xargs:" ]; then
