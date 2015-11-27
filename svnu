@@ -289,6 +289,11 @@ Instale 'dialog' para poder utilizar essa funcionalidade."
 	for s in $selected; do
 		# Trim
 		s=$(echo $s | "$sed" 's/^\s*\(.*\)\s*$/\1/')
+		# Correção em nomes de arquivos com arroba (ambiguidade com o arroba de designação de revisão)
+		contains_at=$(echo $s | "$grep" '@')
+		if [ "$contains_at" != "" ]; then
+			s="$s@"
+		fi
 		# Remove char escaping
 		s=$(eval "echo $s")
 		if [ "$s" != "" ]; then
